@@ -1,0 +1,46 @@
+name: Veille livres photo
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: veille-livres
+  cancel-in-progress: false
+
+jobs:
+  surveiller:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recuperer les fichiers
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les bibliotheques
+        run: pip install requests beautifulsoup4
+
+      - name: Lancer la surveillance
+        env:
+          BOOKS_EMAIL_FROM: ${{ secrets.BOOKS_EMAIL_FROM }}
+          BOOKS_EMAIL_TO: ${{ secrets.BOOKS_EMAIL_TO }}
+          BOOKS_EMAIL_PASSWORD: ${{ secrets.BOOKS_EMAIL_PASSWORD }}
+        run: python veille_livres.py
+
+      - name: Sauvegarder l'historique
+        if: success()
+        run: |
+          if [ -f livres_deja_vus.json ]; then
+            git add livres_deja_vus.json
+            if ! git diff --cached --quiet; then
+              git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Mettre a jour l'historique des livres"
+              git push
+            fi
+          fi
